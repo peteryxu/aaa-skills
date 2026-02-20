@@ -16,6 +16,21 @@ cp -r .claude/skills/drawio /path/to/your/project/.claude/skills/drawio
 
 Restart Claude Code after installing.
 
+## Quick start
+
+Say any of these to Claude Code after installing the skill:
+
+| What you want | Example prompt |
+|---------------|----------------|
+| AWS architecture | `Draw an AWS 3-tier architecture with ALB, EC2 in two AZs, RDS, and ElastiCache. Save to arch.drawio.` |
+| Serverless architecture | `Create a serverless diagram: API Gateway → Lambda → DynamoDB, with S3 for assets and SNS for notifications.` |
+| Flowchart | `Generate a Mermaid flowchart for a user login flow with happy path and error handling.` |
+| Sequence diagram | `Make a sequence diagram: browser → API Gateway → Lambda → DynamoDB, in Mermaid format.` |
+| ERD | `Create an ERD for a blog app with Users, Posts, Comments, and Tags.` |
+| Org chart | `Generate a CSV org chart: CTO → two VPs → four team leads.` |
+| Read a diagram | `Read arch.drawio and describe what's in it.` |
+| Modify a diagram | `Add a CloudWatch node to arch.drawio connected to the Lambda function.` |
+
 ## Viewers
 
 Standalone browser tools — no install needed, just open in any browser:
