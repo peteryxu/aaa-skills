@@ -1,30 +1,44 @@
 #!/usr/bin/env bash
-# install.sh — Install Claude Code skills to ~/.claude/skills/
+# install.sh — Install Claude Code skills to ~/.claude/skills/ or a project directory
 #
 # Usage:
-#   ./install.sh                  Install all skills
-#   ./install.sh drawio           Install a specific skill
-#   ./install.sh --dry-run        Preview what would be installed
-#   ./install.sh --force drawio   Overwrite existing skill
+#   ./install.sh                                  Install all skills (user-level)
+#   ./install.sh drawio                           Install a specific skill (user-level)
+#   ./install.sh --target /path/to/project        Install all skills (project-level)
+#   ./install.sh drawio --target /path/to/project Install one skill (project-level)
+#   ./install.sh --dry-run                        Preview what would be installed
+#   ./install.sh --force                          Overwrite existing installs
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 SKILLS_SRC="$REPO_DIR/.claude/skills"
-SKILLS_DST="$HOME/.claude/skills"
 
 DRY_RUN=false
 FORCE=false
 TARGET_SKILL=""
+TARGET_DIR=""
 
-for arg in "$@"; do
-  case $arg in
-    --dry-run) DRY_RUN=true ;;
-    --force)   FORCE=true ;;
-    --*)       echo "Unknown flag: $arg"; exit 1 ;;
-    *)         TARGET_SKILL="$arg" ;;
+# Parse args (handle --target <value> pair)
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --dry-run) DRY_RUN=true; shift ;;
+    --force)   FORCE=true; shift ;;
+    --target)
+      [[ -z "${2:-}" ]] && { echo "ERROR: --target requires a directory path"; exit 1; }
+      TARGET_DIR="$2"; shift 2 ;;
+    --target=*) TARGET_DIR="${1#--target=}"; shift ;;
+    --*)       echo "Unknown flag: $1"; exit 1 ;;
+    *)         TARGET_SKILL="$1"; shift ;;
   esac
 done
+
+# Resolve destination
+if [[ -n "$TARGET_DIR" ]]; then
+  SKILLS_DST="$TARGET_DIR/.claude/skills"
+else
+  SKILLS_DST="$HOME/.claude/skills"
+fi
 
 mkdir -p "$SKILLS_DST"
 

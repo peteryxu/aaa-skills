@@ -32,9 +32,17 @@ cd aaa-skills
 ./install.sh --force
 ```
 
+**Project-level install** (skill only active in that project):
+```bash
+./install.sh --target /path/to/your/project
+./install.sh drawio --target /path/to/your/project
+```
+
 **Manual copy (no script):**
 ```bash
 cp -r .claude/skills/drawio ~/.claude/skills/drawio
+# or project-level:
+cp -r .claude/skills/drawio /path/to/your/project/.claude/skills/drawio
 ```
 
 Restart Claude Code after installing to pick up new skills.
