@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draw.io Viewer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+
+  /* Header */
+  .header { background: #16213e; padding: 12px 24px; display: flex; align-items: center; gap: 16px; border-bottom: 1px solid #0f3460; flex-wrap: wrap; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #e94560; flex-shrink: 0; }
+  .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn { padding: 7px 16px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #e94560; color: #fff; }
+  .btn-primary:hover { background: #c73a52; }
+  .btn-secondary { background: #0f3460; color: #a0c4ff; border: 1px solid #1a4a8a; }
+  .btn-secondary:hover { background: #1a4a8a; }
+  .btn-icon { padding: 7px 10px; font-size: 16px; }
+  .file-info { font-size: 12px; color: #8899aa; margin-left: 8px; }
+
+  /* Layout */
+  .container { display: flex; height: calc(100vh - 53px); }
+
+  /* Editor panel */
+  .editor-panel { width: 420px; display: flex; flex-direction: column; background: #16213e; border-right: 1px solid #0f3460; flex-shrink: 0; transition: width 0.2s; }
+  .editor-panel.collapsed { width: 0; overflow: hidden; border-right: none; }
+  .editor-tabs { display: flex; border-bottom: 1px solid #0f3460; }
+  .editor-tab { padding: 8px 16px; font-size: 12px; cursor: pointer; color: #8899aa; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .editor-tab.active { color: #e94560; border-bottom-color: #e94560; }
+  .editor-tab:hover { color: #e0e0e0; }
+  .editor-area { flex: 1; position: relative; }
+  .editor-area textarea { width: 100%; height: 100%; background: #0d1b2a; color: #b8d4e3; border: none; padding: 12px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 12px; line-height: 1.5; resize: none; outline: none; tab-size: 2; }
+  .editor-area textarea::placeholder { color: #4a5568; }
+  .editor-footer { padding: 8px 12px; border-top: 1px solid #0f3460; display: flex; justify-content: space-between; align-items: center; }
+  .editor-footer .hint { font-size: 11px; color: #5a6a7a; }
+
+  /* Viewer panel */
+  .viewer-panel { flex: 1; display: flex; flex-direction: column; background: #f5f5f5; position: relative; overflow: hidden; }
+  .viewer-toolbar { background: #fff; padding: 6px 12px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #ddd; }
+  .viewer-toolbar .btn { color: #333; background: #f0f0f0; border: 1px solid #ddd; }
+  .viewer-toolbar .btn:hover { background: #e0e0e0; }
+  .zoom-display { font-size: 12px; color: #666; min-width: 40px; text-align: center; }
+  .viewer-content { flex: 1; overflow: auto; position: relative; }
+  .viewer-content .mxgraph { margin: 20px auto; }
+
+  /* Empty state */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #999; gap: 16px; }
+  .empty-state .icon { font-size: 64px; opacity: 0.3; }
+  .empty-state p { font-size: 14px; }
+  .empty-state .drop-hint { font-size: 12px; color: #aaa; padding: 12px 24px; border: 2px dashed #ccc; border-radius: 8px; }
+
+  /* Drag overlay */
+  .drag-overlay { display: none; position: fixed; inset: 0; background: rgba(233,69,96,0.1); border: 3px dashed #e94560; z-index: 1000; pointer-events: none; }
+  .drag-overlay.active { display: flex; align-items: center; justify-content: center; }
+  .drag-overlay span { background: #e94560; color: #fff; padding: 16px 32px; border-radius: 8px; font-size: 18px; font-weight: 600; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #16213e; color: #e0e0e0; padding: 10px 20px; border-radius: 8px; font-size: 13px; border: 1px solid #0f3460; transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 500; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.error { border-color: #e94560; }
+
+  /* Recent files */
+  .recent-list { padding: 8px; max-height: 200px; overflow-y: auto; }
+  .recent-item { padding: 8px 12px; font-size: 12px; color: #8899aa; cursor: pointer; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+  .recent-item:hover { background: #0f3460; color: #e0e0e0; }
+  .recent-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-item .time { font-size: 10px; color: #5a6a7a; flex-shrink: 0; margin-left: 8px; }
+
+  @media (max-width: 800px) {
+    .editor-panel { width: 100%; height: 40vh; border-right: none; border-bottom: 1px solid #0f3460; }
+    .container { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Draw.io Viewer</h1>
+  <div class="header-actions">
+    <button class="btn btn-primary" onclick="openFile()">Open .drawio</button>
+    <button class="btn btn-secondary" onclick="toggleEditor()" id="toggleBtn">Hide Editor</button>
+    <button class="btn btn-secondary btn-icon" onclick="renderXml()" title="Render (Cmd+Enter)">&#9654;</button>
+  </div>
+  <span class="file-info" id="fileInfo"></span>
+</div>
+
+<div class="container">
+  <div class="editor-panel" id="editorPanel">
+    <div class="editor-tabs">
+      <div class="editor-tab active" data-tab="xml" onclick="switchTab('xml')">XML</div>
+      <div class="editor-tab" data-tab="recent" onclick="switchTab('recent')">Recent</div>
+    </div>
+    <div class="editor-area" id="tabXml">
+      <textarea id="xmlInput" placeholder="Paste draw.io XML here, or open a .drawio file..." spellcheck="false"></textarea>
+    </div>
+    <div class="editor-area" id="tabRecent" style="display:none">
+      <div class="recent-list" id="recentList">
+        <div style="padding:20px;color:#5a6a7a;font-size:13px;text-align:center;">No recent files</div>
+      </div>
+    </div>
+    <div class="editor-footer">
+      <span class="hint">Cmd+Enter to render</span>
+      <button class="btn btn-primary" onclick="renderXml()">Render</button>
+    </div>
+  </div>
+
+  <div class="viewer-panel">
+    <div class="viewer-toolbar">
+      <button class="btn btn-icon" onclick="zoomIn()" title="Zoom In">+</button>
+      <button class="btn btn-icon" onclick="zoomOut()" title="Zoom Out">-</button>
+      <span class="zoom-display" id="zoomLevel">100%</span>
+      <button class="btn btn-icon" onclick="zoomFit()" title="Fit">&#8596;</button>
+      <div style="flex:1"></div>
+      <button class="btn" onclick="exportPng()" title="Export PNG">PNG</button>
+      <button class="btn" onclick="openInDrawio()" title="Open in draw.io">Edit</button>
+    </div>
+    <div class="viewer-content" id="viewerContent">
+      <div class="empty-state" id="emptyState">
+        <div class="icon">&#9998;</div>
+        <p>No diagram loaded</p>
+        <div class="drop-hint">Drop a .drawio file here, paste XML, or click Open</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drag-overlay" id="dragOverlay"><span>Drop .drawio file</span></div>
+<div class="toast" id="toast"></div>
+
+<input type="file" id="fileInput" accept=".drawio,.xml,.dio" style="display:none" onchange="handleFileSelect(event)">
+
+<script>
+  let currentZoom = 1;
+  let currentXml = '';
+  let viewerReady = false;
+  const RECENT_KEY = 'drawio-viewer-recent';
+
+  // Load the draw.io viewer script
+  function loadViewer() {
+    return new Promise((resolve, reject) => {
+      if (window.GraphViewer) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://viewer.diagrams.net/js/viewer-static.min.js';
+      s.onload = () => { viewerReady = true; resolve(); };
+      s.onerror = () => reject(new Error('Failed to load draw.io viewer'));
+      document.head.appendChild(s);
+    });
+  }
+
+  loadViewer().catch(e => showToast(e.message, true));
+
+  // Render XML into viewer
+  async function renderXml(xml) {
+    xml = xml || document.getElementById('xmlInput').value.trim();
+    if (!xml) { showToast('No XML to render', true); return; }
+
+    // Basic validation
+    if (!xml.includes('<mxfile') && !xml.includes('<mxGraphModel')) {
+      showToast('Invalid draw.io XML', true);
+      return;
+    }
+
+    try {
+      await loadViewer();
+    } catch (e) {
+      showToast('Viewer not loaded yet', true);
+      return;
+    }
+
+    currentXml = xml;
+
+    const content = document.getElementById('viewerContent');
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+
+    // Build via DOM to avoid escaping hell
+    content.innerHTML = '';
+    const div = document.createElement('div');
+    div.className = 'mxgraph';
+    div.style.maxWidth = '100%';
+    const config = {
+      highlight: '#0000ff',
+      nav: true,
+      resize: true,
+      toolbar: 'zoom layers lightbox',
+      edit: '_blank',
+      xml: xml
+    };
+    div.setAttribute('data-mxgraph', JSON.stringify(config));
+    content.appendChild(div);
+
+    // Re-init viewer
+    if (window.GraphViewer) {
+      GraphViewer.processElements();
+    }
+
+    currentZoom = 1;
+    document.getElementById('zoomLevel').textContent = '100%';
+    showToast('Diagram rendered');
+  }
+
+  // File handling
+  function openFile() {
+    document.getElementById('fileInput').click();
+  }
+
+  function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    readFile(file);
+    event.target.value = '';
+  }
+
+  function readFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const xml = e.target.result;
+      document.getElementById('xmlInput').value = xml;
+      document.getElementById('fileInfo').textContent = file.name + ' (' + formatBytes(file.size) + ')';
+      renderXml(xml);
+      addRecent(file.name, xml);
+    };
+    reader.onerror = () => showToast('Failed to read file', true);
+    reader.readAsText(file);
+  }
+
+  // Drag and drop
+  document.addEventListener('dragover', (e) => { e.preventDefault(); document.getElementById('dragOverlay').classList.add('active'); });
+  document.addEventListener('dragleave', (e) => { if (e.relatedTarget === null) document.getElementById('dragOverlay').classList.remove('active'); });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    document.getElementById('dragOverlay').classList.remove('active');
+    const file = e.dataTransfer.files[0];
+    if (file && (file.name.endsWith('.drawio') || file.name.endsWith('.xml') || file.name.endsWith('.dio'))) {
+      readFile(file);
+    } else {
+      showToast('Please drop a .drawio or .xml file', true);
+    }
+  });
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); renderXml(); }
+  });
+
+  // Zoom
+  function zoomIn() {
+    currentZoom = Math.min(currentZoom + 0.25, 4);
+    applyZoom();
+  }
+  function zoomOut() {
+    currentZoom = Math.max(currentZoom - 0.25, 0.25);
+    applyZoom();
+  }
+  function zoomFit() {
+    currentZoom = 1;
+    applyZoom();
+  }
+  function applyZoom() {
+    const el = document.querySelector('.viewer-content .mxgraph, .viewer-content .geDiagramContainer');
+    if (el) {
+      el.style.transform = `scale(${currentZoom})`;
+      el.style.transformOrigin = 'top left';
+    }
+    document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+  }
+
+  // Export PNG (opens draw.io export)
+  function exportPng() {
+    if (!currentXml) { showToast('No diagram to export', true); return; }
+    const encoded = encodeURIComponent(currentXml);
+    window.open('https://viewer.diagrams.net/export3.html?xml=' + encoded, '_blank');
+  }
+
+  // Open in draw.io editor
+  function openInDrawio() {
+    if (!currentXml) { showToast('No diagram to edit', true); return; }
+    const encoded = encodeURIComponent(currentXml);
+    window.open('https://app.diagrams.net/#R' + btoa(unescape(encodeURIComponent(currentXml))), '_blank');
+  }
+
+  // Editor toggle
+  function toggleEditor() {
+    const panel = document.getElementById('editorPanel');
+    const btn = document.getElementById('toggleBtn');
+    panel.classList.toggle('collapsed');
+    btn.textContent = panel.classList.contains('collapsed') ? 'Show Editor' : 'Hide Editor';
+  }
+
+  // Tabs
+  function switchTab(tab) {
+    document.querySelectorAll('.editor-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.getElementById('tabXml').style.display = tab === 'xml' ? '' : 'none';
+    document.getElementById('tabRecent').style.display = tab === 'recent' ? '' : 'none';
+    if (tab === 'recent') loadRecent();
+  }
+
+  // Recent files (localStorage)
+  function addRecent(name, xml) {
+    let list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    list = list.filter(r => r.name !== name);
+    list.unshift({ name, xml: xml.substring(0, 50000), time: Date.now() });
+    if (list.length > 10) list = list.slice(0, 10);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  }
+
+  function loadRecent() {
+    const list = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+    const el = document.getElementById('recentList');
+    if (!list.length) {
+      el.innerHTML = '<div style="padding:20px;color:#5a6a7a;font-size:13px;text-align:center;">No recent files</div>';
+      return;
+    }
+    el.innerHTML = list.map((r, i) => `
+      <div class="recent-item" onclick="loadRecent_${i}()">
+        <span class="name">${escHtml(r.name)}</span>
+        <span class="time">${timeAgo(r.time)}</span>
+      </div>
+    `).join('');
+    list.forEach((r, i) => {
+      window['loadRecent_' + i] = () => {
+        document.getElementById('xmlInput').value = r.xml;
+        document.getElementById('fileInfo').textContent = r.name;
+        switchTab('xml');
+        renderXml(r.xml);
+      };
+    });
+  }
+
+  // Toast notification
+  function showToast(msg, isError) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.className = 'toast', 2500);
+  }
+
+  // Helpers
+  function formatBytes(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(1) + ' MB';
+  }
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function timeAgo(ts) {
+    const d = Date.now() - ts;
+    if (d < 60000) return 'just now';
+    if (d < 3600000) return Math.floor(d/60000) + 'm ago';
+    if (d < 86400000) return Math.floor(d/3600000) + 'h ago';
+    return Math.floor(d/86400000) + 'd ago';
+  }
+
+  // Auto-render if URL has hash with file path (for local dev)
+  if (location.hash) {
+    const path = decodeURIComponent(location.hash.slice(1));
+    document.getElementById('fileInfo').textContent = 'Loading: ' + path;
+  }
+</script>
+</body>
+</html>

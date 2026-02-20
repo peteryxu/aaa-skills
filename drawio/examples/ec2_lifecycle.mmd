@@ -1,0 +1,13 @@
+stateDiagram-v2
+    shutting_down : shutting-down
+    [*] --> pending : launch
+    pending --> running
+    running --> stopping : stop
+    stopping --> stopped
+    stopped --> pending : start
+    running --> shutting_down : terminate
+    stopped --> shutting_down : terminate
+    shutting_down --> terminated
+    terminated --> [*]
+    running --> rebooting : reboot
+    rebooting --> running
